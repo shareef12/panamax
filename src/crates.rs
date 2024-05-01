@@ -8,6 +8,7 @@ use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use reqwest::header::HeaderValue;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
@@ -108,13 +109,16 @@ pub async fn sync_crates_files(
     crates: &ConfigCrates,
     user_agent: &HeaderValue,
 ) -> Result<(), SyncError> {
-    let is_crate_whitelist_only = vendor_path.is_some() || cargo_lock_filepath.is_some();
+    let is_crate_whitelist_only =
+        vendor_path.is_some() || cargo_lock_filepath.is_some() || crates.crates.is_some();
 
     // if a vendor_path, parse the filepath for Cargo.toml files for each crate, filling vendors
     let mut mirror_entries = vec![];
     vendor_path_to_mirror_entries(&mut mirror_entries, vendor_path.as_ref());
     // gather crates from Cargo.lock if supplied
     cargo_lock_to_mirror_entries(&mut mirror_entries, cargo_lock_filepath.as_ref());
+    // gather crates from the crate allowlist if supplied
+    crate_allowlist_to_mirror_entries(&mut mirror_entries, crates.crates.as_ref());
 
     let prefix = padded_prefix_message(2, 3, "Syncing crates files");
 
@@ -443,6 +447,35 @@ pub(crate) fn cargo_lock_to_mirror_entries(
             }
         } else {
             eprintln!("{:?} is not a Cargo.lock!", cargo_lock_filepath);
+        }
+    }
+}
+
+pub(crate) fn crate_allowlist_to_mirror_entries(
+    mirror_entries: &mut Vec<CrateEntry>,
+    crates: Option<&Vec<String>>,
+) {
+    if let Some(crates) = crates {
+        let mut resolver = crate_deps::Resolver::new().unwrap();
+        let mut all_crates = HashSet::new();
+        for crate_name in crates {
+            let feature_errs = resolver
+                .merge_dependencies(crate_name, None, &mut all_crates)
+                .unwrap_or_else(|e| {
+                    panic!("Couldn't resolve dependencies for package '{crate_name}': {e:#}")
+                });
+            for feature_err in feature_errs {
+                eprintln!("Couldn't resolve dependencies for package '{crate_name}' with feature '{}': {:#}", feature_err.name, feature_err.error);
+            }
+        }
+
+        for package in all_crates {
+            mirror_entries.push(CrateEntry {
+                name: package.name,
+                vers: package.version,
+                cksum: None,
+                yanked: None,
+            })
         }
     }
 }

@@ -68,6 +68,7 @@ pub struct ConfigCrates {
     pub source_index: String,
     pub use_new_crates_format: Option<bool>,
     pub base_url: Option<String>,
+    pub crates: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -126,3 +126,20 @@ source_index = "https://github.com/rust-lang/crates.io-index"
 # Remove this parameter to perform no rewriting.
 # If removed, the `panamax rewrite` command can be used later.
 base_url = "http://panamax.internal/crates"
+
+
+# Crates to include in the mirror
+# Uncomment the following lines to limit which crates get downloaded.
+# Dependencies will be recursively downloaded as well.
+crates = [
+    "syn",
+    "proc-macro2",
+    "quote",
+    "libc",
+    "bitflags",
+    "rand",
+    "rand_core",
+    "cfg-if",
+    "serde",
+    "hashbrown",
+]
